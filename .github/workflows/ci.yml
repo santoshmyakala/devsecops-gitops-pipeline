@@ -95,7 +95,8 @@ jobs:
           kubectl -n kyverno rollout status deploy/kyverno-admission-controller --timeout=300s
       - name: Apply policies and wait until they are ready
         run: |
-          kubectl apply -f policies/kyverno/
+          # The webhook can lag behind the rollout; retry until it accepts the policies.
+          for _ in $(seq 1 24); do kubectl apply -f policies/kyverno/ && break; sleep 5; done
           for _ in $(seq 1 60); do
             not_ready=$(kubectl get validatingpolicies,imagevalidatingpolicies -o json \
               | jq '[.items[] | select((.status.conditionStatus.ready // false) != true)] | length')

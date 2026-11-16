@@ -10,7 +10,7 @@ kind get clusters | grep -qx "$CLUSTER" || kind create cluster --name "$CLUSTER"
 echo "--> Kyverno $KYVERNO_VERSION"
 kubectl apply --server-side -f "https://github.com/kyverno/kyverno/releases/download/${KYVERNO_VERSION}/install.yaml"
 kubectl -n kyverno rollout status deploy/kyverno-admission-controller --timeout=300s
-kubectl apply -f policies/kyverno/
+for _ in $(seq 1 24); do kubectl apply -f policies/kyverno/ && break; sleep 5; done   # webhook may lag the rollout
 
 echo "--> Argo CD"
 kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
