@@ -81,7 +81,8 @@ jobs:
           python-version: "3.12"
       - run: pip install "semgrep==${SEMGREP_VERSION}"
       - name: Semgrep
-        run: semgrep scan --config "${{ inputs.semgrep-config }}" --metrics=off --error --sarif --output semgrep.sarif .
+        # Findings are printed in the log (text) and uploaded to code scanning (SARIF).
+        run: semgrep scan --config "${{ inputs.semgrep-config }}" --metrics=off --error --text --sarif-output=semgrep.sarif .
       - name: Upload to GitHub code scanning
         if: always() && hashFiles('semgrep.sarif') != ''
         uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
