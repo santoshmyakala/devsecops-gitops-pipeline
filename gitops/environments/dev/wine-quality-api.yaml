@@ -1,7 +1,7 @@
 # Managed by the promote workflow: the digest is only written after its signature is verified.
 image:
   repository: ghcr.io/santoshmyakala/wine-quality-mlops
-  digest: ""
+  digest: "sha256:43db59cf8644573bd91b3cf8b6567b98f161439ffa8cf218b19ae98313e05046"
 replicaCount: 1
 autoscaling:
   enabled: false
