@@ -71,8 +71,12 @@ jobs:
             gitops/argocd/
       - name: Rendered workloads satisfy every pod-security policy
         run: |
+          policies=()
+          for f in policies/kyverno/*.yaml; do
+            [[ "$f" == *verify-image* ]] || policies+=("$f")   # signature checks need a registry; covered by e2e
+          done
           for env in dev prod; do
-            ./kyverno apply $(ls policies/kyverno/*.yaml | grep -v verify-image) --resource "rendered-$env.yaml" --audit-warn=false
+            ./kyverno apply "${policies[@]}" --resource "rendered-$env.yaml"
           done
 
   e2e:
@@ -91,7 +95,7 @@ jobs:
       - name: Apply policies and wait until they are ready
         run: |
           kubectl apply -f policies/kyverno/
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             not_ready=$(kubectl get validatingpolicies,imagevalidatingpolicies -o json \
               | jq '[.items[] | select((.status.conditionStatus.ready // false) != true)] | length')
             [ "$not_ready" = "0" ] && break; sleep 5

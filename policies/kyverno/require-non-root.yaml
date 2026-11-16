@@ -10,9 +10,7 @@ metadata:
       Pods must run as non-root, set at pod level or on every container, so a container breakout does not start as root.
 spec:
   validationActions: [Deny]
-  autogen:
-    podControllers:
-      enabled: false   # controllers are matched explicitly below
+  # Pods and workload controllers are matched explicitly, so Kyverno does not auto-generate controller rules.
   matchConstraints:
     resourceRules:
       - apiGroups: [""]

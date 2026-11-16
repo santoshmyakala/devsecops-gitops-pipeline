@@ -10,9 +10,7 @@ metadata:
       Images must be pinned by digest or an explicit tag other than latest, so what runs is what was scanned and approved.
 spec:
   validationActions: [Deny]
-  autogen:
-    podControllers:
-      enabled: false   # controllers are matched explicitly below
+  # Pods and workload controllers are matched explicitly, so Kyverno does not auto-generate controller rules.
   matchConstraints:
     resourceRules:
       - apiGroups: [""]

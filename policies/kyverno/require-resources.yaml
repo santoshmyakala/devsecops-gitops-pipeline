@@ -10,9 +10,7 @@ metadata:
       Requests make scheduling predictable; a memory limit stops one workload starving the node.
 spec:
   validationActions: [Deny]
-  autogen:
-    podControllers:
-      enabled: false   # controllers are matched explicitly below
+  # Pods and workload controllers are matched explicitly, so Kyverno does not auto-generate controller rules.
   matchConstraints:
     resourceRules:
       - apiGroups: [""]

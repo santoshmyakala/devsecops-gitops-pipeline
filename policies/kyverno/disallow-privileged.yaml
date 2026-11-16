@@ -10,9 +10,7 @@ metadata:
       Privileged containers share the host kernel's capabilities and devices, so a container compromise becomes a node compromise.
 spec:
   validationActions: [Deny]
-  autogen:
-    podControllers:
-      enabled: false   # controllers are matched explicitly below
+  # Pods and workload controllers are matched explicitly, so Kyverno does not auto-generate controller rules.
   matchConstraints:
     resourceRules:
       - apiGroups: [""]
