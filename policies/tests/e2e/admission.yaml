@@ -1,0 +1,42 @@
+# Server-side dry-run fixtures for the kind e2e test. "allowed-*" must be admitted, "denied-*" rejected.
+apiVersion: v1
+kind: Pod
+metadata: { name: allowed-compliant, namespace: e2e }
+spec:
+  securityContext: { runAsNonRoot: true, runAsUser: 101 }
+  containers:
+    - name: web
+      image: nginxinc/nginx-unprivileged:1.29-alpine
+      securityContext: { allowPrivilegeEscalation: false }
+      resources: { requests: { cpu: 50m, memory: 32Mi }, limits: { memory: 64Mi } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: denied-privileged, namespace: e2e }
+spec:
+  securityContext: { runAsNonRoot: true, runAsUser: 101 }
+  containers:
+    - name: web
+      image: nginxinc/nginx-unprivileged:1.29-alpine
+      securityContext: { privileged: true, allowPrivilegeEscalation: false }
+      resources: { requests: { cpu: 50m, memory: 32Mi }, limits: { memory: 64Mi } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: denied-root-latest, namespace: e2e }
+spec:
+  containers:
+    - name: web
+      image: nginx:latest
+      resources: { requests: { cpu: 50m, memory: 32Mi }, limits: { memory: 64Mi } }
+---
+apiVersion: v1
+kind: Pod
+metadata: { name: denied-unsigned-image, namespace: e2e }
+spec:
+  securityContext: { runAsNonRoot: true, runAsUser: 10001 }
+  containers:
+    - name: api
+      image: ghcr.io/santoshmyakala/wine-quality-mlops:unsigned-does-not-exist
+      securityContext: { allowPrivilegeEscalation: false }
+      resources: { requests: { cpu: 50m, memory: 64Mi }, limits: { memory: 128Mi } }

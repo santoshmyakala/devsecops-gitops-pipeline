@@ -1,0 +1,83 @@
+# GitOps promotion gate. Writes an image digest into an environment's values file only after:
+#   * the Sigstore signature proves it was built by secure-container.yml on main, and
+#   * an SBOM attestation from the same identity exists, and
+#   * for prod: the digest is exactly what dev is running.
+# Argo CD then syncs dev automatically; prod is synced manually.
+name: promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [dev, prod]
+        required: true
+      app:
+        type: choice
+        options: [wine-quality-api]
+        default: wine-quality-api
+      digest:
+        description: "sha256:... (from the secure-delivery job summary). For prod, leave empty to promote dev's digest."
+        type: string
+        default: ""
+
+permissions:
+  contents: write   # commit the values change
+
+concurrency:
+  group: promote-${{ inputs.app }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}   # add required reviewers to the "prod" environment in repo settings
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: Resolve digest
+        id: resolve
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          APP: ${{ inputs.app }}
+          INPUT_DIGEST: ${{ inputs.digest }}
+        run: |
+          dev_digest=$(yq -r '.image.digest' "gitops/environments/dev/${APP}.yaml")
+          repo=$(yq -r '.image.repository' "gitops/environments/${ENVIRONMENT}/${APP}.yaml")
+          digest="${INPUT_DIGEST:-}"
+          if [ "$ENVIRONMENT" = prod ]; then
+            digest="${digest:-$dev_digest}"
+            [ "$digest" = "$dev_digest" ] || { echo "::error::prod may only receive the digest running in dev ($dev_digest)"; exit 1; }
+          fi
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::invalid or empty digest '$digest'"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image=$repo@$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Verify signature and SBOM attestation
+        env:
+          IMAGE: ${{ steps.resolve.outputs.image }}
+          IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/secure-container.yml@refs/heads/main
+        run: |
+          cosign verify "$IMAGE" \
+            --certificate-identity "$IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
+          cosign verify-attestation "$IMAGE" --type spdxjson \
+            --certificate-identity "$IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com > /dev/null
+          echo "Signature and SBOM attestation verified for $IMAGE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit promotion
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          APP: ${{ inputs.app }}
+          DIGEST: ${{ steps.resolve.outputs.digest }}
+        run: |
+          file="gitops/environments/${ENVIRONMENT}/${APP}.yaml"
+          yq -i ".image.digest = \"${DIGEST}\"" "$file"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$file"
+          git diff --cached --quiet && { echo "Already at ${DIGEST}"; exit 0; }
+          git commit -m "promote(${ENVIRONMENT}): ${APP} -> ${DIGEST:0:19}"
+          git push

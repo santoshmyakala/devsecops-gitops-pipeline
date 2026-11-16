@@ -1,0 +1,6 @@
+rendered-*.yaml
+_app/
+kyverno
+kubeconform
+actionlint
+gitleaks

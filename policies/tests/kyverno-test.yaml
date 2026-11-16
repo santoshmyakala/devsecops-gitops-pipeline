@@ -1,0 +1,29 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pod-security-baseline
+policies:
+  - ../kyverno/disallow-privileged.yaml
+  - ../kyverno/require-non-root.yaml
+  - ../kyverno/disallow-privilege-escalation.yaml
+  - ../kyverno/require-resources.yaml
+  - ../kyverno/disallow-latest-tag.yaml
+  - ../kyverno/require-probes.yaml
+resources:
+  - resources/workloads.yaml
+results:
+  # the compliant workload (shaped like the wine-quality-api Helm chart) passes everything
+  - { policy: disallow-privileged, resources: [good-app], kind: Deployment, result: pass }
+  - { policy: require-non-root, resources: [good-app], kind: Deployment, result: pass }
+  - { policy: disallow-privilege-escalation, resources: [good-app], kind: Deployment, result: pass }
+  - { policy: require-resources, resources: [good-app], kind: Deployment, result: pass }
+  - { policy: disallow-latest-tag, resources: [good-app], kind: Deployment, result: pass }
+  - { policy: require-probes, resources: [good-app], kind: Deployment, result: pass }
+  # each violation is caught
+  - { policy: disallow-privileged, resources: [bad-privileged], kind: Deployment, result: fail }
+  - { policy: require-non-root, resources: [bad-root-latest-noprobes], kind: Deployment, result: fail }
+  - { policy: disallow-privilege-escalation, resources: [bad-root-latest-noprobes], kind: Deployment, result: fail }
+  - { policy: disallow-latest-tag, resources: [bad-root-latest-noprobes], kind: Deployment, result: fail }
+  - { policy: require-probes, resources: [bad-root-latest-noprobes], kind: Deployment, result: fail }
+  - { policy: require-resources, resources: [bad-no-resources-untagged], kind: Pod, result: fail }
+  - { policy: disallow-latest-tag, resources: [bad-no-resources-untagged], kind: Pod, result: fail }

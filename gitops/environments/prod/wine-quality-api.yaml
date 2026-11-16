@@ -1,0 +1,8 @@
+# Managed by the promote workflow: prod only accepts the digest currently running in dev.
+image:
+  repository: ghcr.io/santoshmyakala/wine-quality-mlops
+  digest: ""
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6

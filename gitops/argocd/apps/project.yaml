@@ -1,0 +1,23 @@
+# Argo CD project: limits which repos may be deployed and where.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: portfolio
+  namespace: argocd
+spec:
+  description: Portfolio workloads delivered through the secure pipeline
+  sourceRepos:
+    - https://github.com/santoshmyakala/wine-quality-mlops
+    - https://github.com/santoshmyakala/devsecops-gitops-pipeline
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: wine-dev
+    - server: https://kubernetes.default.svc
+      namespace: wine-prod
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - { group: apps, kind: Deployment }
+    - { group: "", kind: Service }
+    - { group: autoscaling, kind: HorizontalPodAutoscaler }

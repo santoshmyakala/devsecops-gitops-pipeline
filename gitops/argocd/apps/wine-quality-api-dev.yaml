@@ -1,0 +1,25 @@
+# Chart comes from the application repo; environment values (promoted digest) from this repo.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wine-quality-api-dev
+  namespace: argocd
+spec:
+  project: portfolio
+  sources:
+    - repoURL: https://github.com/santoshmyakala/wine-quality-mlops
+      targetRevision: main
+      path: deploy/helm/wine-quality-api
+      helm:
+        releaseName: wine
+        valueFiles:
+          - $values/gitops/environments/dev/wine-quality-api.yaml
+    - repoURL: https://github.com/santoshmyakala/devsecops-gitops-pipeline
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: wine-dev
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]
