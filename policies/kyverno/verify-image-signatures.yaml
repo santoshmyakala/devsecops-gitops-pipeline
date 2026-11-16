@@ -1,0 +1,48 @@
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: verify-image-signatures
+  annotations:
+    policies.kyverno.io/title: Only admit images signed by the central pipeline
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: critical
+    policies.kyverno.io/description: >-
+      Images from ghcr.io/santoshmyakala must carry a Sigstore keyless signature whose
+      certificate identity is the reusable secure-container workflow on main, and an SPDX SBOM
+      attestation signed by the same identity. Tags are rewritten to the verified digest.
+spec:
+  validationActions: [Deny]
+  failurePolicy: Fail
+  webhookConfiguration:
+    timeoutSeconds: 30
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  matchConditions:
+    - name: skip-system-namespaces
+      expression: "!(object.metadata.?namespace.orValue('default') in ['kube-system', 'kyverno', 'argocd'])"
+  matchImageReferences:
+    - glob: "ghcr.io/santoshmyakala/*"
+  validationConfigurations:
+    required: true
+    mutateDigest: true
+    verifyDigest: true
+  attestors:
+    - name: secure-pipeline
+      cosign:
+        keyless:
+          identities:
+            - issuer: https://token.actions.githubusercontent.com
+              subject: https://github.com/santoshmyakala/devsecops-gitops-pipeline/.github/workflows/secure-container.yml@refs/heads/main
+  attestations:
+    - name: sbom
+      intoto:
+        type: https://spdx.dev/Document
+  validations:
+    - expression: "images.containers.map(image, verifyImageSignatures(image, [attestors['secure-pipeline']])).all(e, e > 0)"
+      message: Image is not signed by the secure-container workflow on main.
+    - expression: "images.containers.map(image, verifyAttestationSignatures(image, attestations.sbom, [attestors['secure-pipeline']])).all(e, e > 0)"
+      message: Image has no SBOM attestation signed by the secure-container workflow.

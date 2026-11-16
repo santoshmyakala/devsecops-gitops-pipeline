@@ -1,0 +1,32 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-probes
+  annotations:
+    policies.kyverno.io/title: Require liveness and readiness probes
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Probes let Kubernetes send traffic only to ready pods and restart hung ones.
+spec:
+  validationActions: [Deny]
+  autogen:
+    podControllers:
+      enabled: false   # controllers are matched explicitly below
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets]
+  matchConditions:
+    - name: skip-system-namespaces
+      expression: "!(object.metadata.?namespace.orValue('default') in ['kube-system', 'kube-public', 'kube-node-lease', 'kyverno', 'argocd', 'local-path-storage'])"
+  variables:
+    - name: podSpec
+      expression: "object.kind == 'Pod' ? object.spec : object.spec.template.spec"
+    - name: containers
+      expression: "variables.podSpec.containers + variables.podSpec.?initContainers.orValue([])"
+  validations:
+    - expression: "variables.podSpec.containers.all(c, has(c.livenessProbe) && has(c.readinessProbe))"
+      message: Every container needs a livenessProbe and a readinessProbe.

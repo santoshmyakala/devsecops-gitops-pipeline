@@ -1,0 +1,36 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-privilege-escalation
+  annotations:
+    policies.kyverno.io/title: Disallow privilege escalation
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Containers must set allowPrivilegeEscalation=false so setuid binaries cannot gain extra privileges.
+spec:
+  validationActions: [Deny]
+  autogen:
+    podControllers:
+      enabled: false   # controllers are matched explicitly below
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+      - apiGroups: [apps]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [deployments, statefulsets, daemonsets]
+  matchConditions:
+    - name: skip-system-namespaces
+      expression: "!(object.metadata.?namespace.orValue('default') in ['kube-system', 'kube-public', 'kube-node-lease', 'kyverno', 'argocd', 'local-path-storage'])"
+  variables:
+    - name: podSpec
+      expression: "object.kind == 'Pod' ? object.spec : object.spec.template.spec"
+    - name: containers
+      expression: "variables.podSpec.containers + variables.podSpec.?initContainers.orValue([])"
+  validations:
+    - expression: "variables.podSpec.containers.all(c, c.?securityContext.?allowPrivilegeEscalation.orValue(true) == false)"
+      message: Set securityContext.allowPrivilegeEscalation=false on every container.
