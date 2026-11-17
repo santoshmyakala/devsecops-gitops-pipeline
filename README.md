@@ -18,49 +18,19 @@ The first consumer is [wine-quality-mlops](https://github.com/santoshmyakala/win
 
 ### End to end
 
-```mermaid
-flowchart LR
-  dev([Developer]) -->|push / PR| app["App repo<br/>wine-quality-mlops"]
-  app -->|tests · dvc repro| ci[App CI]
-  ci -->|workflow_call| sc
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/supply-chain-dark.svg">
+  <img alt="Signed supply chain: a developer push runs app CI, which calls the reusable secure-container workflow (code scans, build, SBOM, Trivy image gate, smoke test, push, keyless sign and attest via Sigstore Fulcio and Rekor). A release manager runs promote.yml, which verifies the signature and commits the digest to gitops environments; Argo CD syncs and Kyverno admits only pods whose images are signed by the pipeline identity." src="docs/diagrams/supply-chain-light.svg" width="100%">
+</picture>
 
-  subgraph sc["secure-container.yml (this repo)"]
-    direction TB
-    gl[gitleaks<br/>full history] & sg[Semgrep SAST] & tf[Trivy fs<br/>deps · IaC · secrets] --> build[Build image]
-    build --> sbom[Syft SBOM<br/>SPDX] --> scan[Trivy image gate<br/>fixable HIGH/CRITICAL]
-    scan --> smoke[Smoke test] --> push[Push to GHCR<br/>by digest]
-    push --> sign[cosign sign<br/>keyless OIDC] --> att[cosign attest<br/>SBOM]
-  end
-
-  sign -.->|certificate| fulcio[(Fulcio)]
-  sign -.->|log entry| rekor[(Rekor)]
-  push --> ghcr[(GHCR)]
-
-  ops([Release manager]) -->|workflow_dispatch| promote["promote.yml<br/>verify signature + SBOM<br/>prod = dev digest only"]
-  promote -->|commit digest| values[(gitops/environments)]
-  values --> argo[Argo CD]
-  app -. Helm chart .-> argo
-  argo -->|sync| k8s
-  subgraph k8s[Kubernetes]
-    kyv{{Kyverno admission}} --> pods[wine-quality-api pods]
-  end
-  kyv -.->|verify signature| rekor
-  ghcr --> pods
-```
+<sub>Animated diagram generated from <a href="docs/diagrams">docs/diagrams/*.yaml</a> with <a href="https://github.com/santoshmyakala/santoshmyakala/tree/main/tools/archdiagram">archdiagram</a>.</sub>
 
 ### Pipeline stages and gates
 
-```mermaid
-flowchart LR
-  subgraph parallel["Run in parallel — any failure blocks the build"]
-    A["Secrets<br/>gitleaks git --exit-code 1"]
-    B["SAST<br/>Semgrep p/default --error<br/>SARIF → code scanning"]
-    C["SCA + IaC + secrets<br/>Trivy fs vuln,misconfig,secret"]
-  end
-  parallel --> D[Build] --> E["SBOM"] --> F["Image CVE gate"] --> G["Smoke test"]
-  G -->|main only| H["Push · sign · attest"]
-  G -->|pull request| I["Stop: nothing published"]
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/gates-dark.svg">
+  <img alt="Security gates: gitleaks secret scan, Semgrep SAST and Trivy fs run in parallel and must all pass before the image build, SBOM, Trivy image CVE gate and smoke test; on main the image is pushed, signed and attested; on pull requests nothing is published." src="docs/diagrams/gates-light.svg" width="100%">
+</picture>
 
 ### Trust chain: why a pod gets admitted
 

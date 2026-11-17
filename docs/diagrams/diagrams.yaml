@@ -1,0 +1,72 @@
+- out: supply-chain
+  title: Signed software supply chain — commit to running pod
+  subtitle: One reusable workflow builds, scans, signs and attests; promotion and admission both verify the pipeline's keyless identity
+  grid: {dx: 215, dy: 155}
+  groups:
+    - {id: sc, label: secure-container.yml, sub: reusable workflow, icon: githubactions, color: purple, box: [3, 0, 5, 1]}
+    - {id: sigstore, label: Sigstore, icon: signature, color: green, box: [4, 2.45, 5, 2.45]}
+    - {id: k8s, label: Kubernetes, icon: kubernetes, color: blue, box: [4, 3.7, 5, 3.85]}
+  nodes:
+    - {id: dev, label: Developer, sub: push / PR, icon: user, at: [0, 0], color: gray}
+    - {id: app, label: App repo, sub: wine-quality-mlops, icon: github, at: [1, 0], color: gray}
+    - {id: ci, label: App CI, sub: tests · dvc repro, icon: githubactions, at: [2, 0], color: blue}
+    - {id: scans, label: Code scans, sub: gitleaks · Semgrep · Trivy fs, icon: [key, search, trivy], at: [3, 0], color: green}
+    - {id: build, label: Build image, sub: docker buildx, icon: docker, at: [4, 0], color: purple}
+    - {id: sbom, label: Syft SBOM, sub: SPDX JSON, icon: sbom, at: [5, 0], color: purple}
+    - {id: gate, label: Trivy image gate, sub: fixable HIGH/CRITICAL, icon: trivy, at: [5, 1], color: green, pulse: true}
+    - {id: smoke, label: Smoke test, sub: health · metrics · UID, icon: terminal, at: [4, 1], color: purple}
+    - {id: push, label: Push · sign · attest, sub: by digest · keyless, icon: [registry, signature], at: [3, 1], color: green}
+    - {id: ghcr, label: GHCR, sub: image@sha256 + sig + SBOM, icon: [github, registry], at: [3, 2.45], color: purple}
+    - {id: fulcio, label: Fulcio, sub: short-lived certificate, icon: certificate, at: [4, 2.45], color: green}
+    - {id: rekor, label: Rekor, sub: transparency log, icon: logs, at: [5, 2.45], color: green}
+    - {id: rm, label: Release manager, sub: workflow_dispatch, icon: user, at: [0, 3.85], color: gray}
+    - {id: promote, label: promote.yml, sub: verify sig + SBOM, icon: [githubactions, shield], at: [1, 3.85], color: green}
+    - {id: values, label: gitops/environments, sub: dev → prod = same digest, icon: git, at: [2, 3.85], color: orange}
+    - {id: argo, label: Argo CD, sub: app-of-apps sync, icon: argocd, at: [3, 3.85], color: orange}
+    - {id: kyv, label: Kyverno, sub: ImageValidatingPolicy, icon: shield, at: [4, 3.85], color: blue, pulse: true}
+    - {id: pods, label: wine-quality-api, sub: signed digest only, icon: container, at: [5, 3.85], color: blue, stack: true}
+  edges:
+    - {from: dev, to: app, kind: data}
+    - {from: app, to: ci, kind: data}
+    - {from: ci, to: scans, label: workflow_call, kind: control}
+    - {from: scans, to: build, kind: data}
+    - {from: build, to: sbom, kind: data, packet: box}
+    - {from: sbom, to: gate, kind: data, packet: doc}
+    - {from: gate, to: smoke, kind: data, packet: box}
+    - {from: smoke, to: push, kind: data, packet: box}
+    - {from: push, to: ghcr, label: image + signature, kind: secure, at: 0.45}
+    - {from: push, to: sigstore, label: OIDC cert · log entry, kind: secure, at: 0.5}
+    - {from: rm, to: promote, kind: data}
+    - {from: promote, to: ghcr, label: cosign verify, kind: secure, at: 0.35}
+    - {from: promote, to: values, label: commit digest, kind: data, at: 0.5}
+    - {from: values, to: argo, kind: control}
+    - {from: argo, to: kyv, label: create Pod, kind: control}
+    - {from: kyv, to: pods, label: admit, kind: secure}
+    - {from: kyv, to: fulcio, label: verify, kind: secure, at: 0.3}
+    - {from: ghcr, to: pods, label: pull by digest, kind: data, route: vhv, via: [[3, 3.0], [5, 3.0]], packet: box, at: 0.75}
+
+- out: gates
+  title: Security gates in the reusable workflow
+  subtitle: Any failing gate blocks the build; pull requests never publish, main pushes, signs and attests
+  grid: {dx: 205, dy: 140}
+  groups:
+    - {id: par, label: Run in parallel, color: green, box: [0, 0, 0, 2]}
+  nodes:
+    - {id: a, label: Secrets, sub: gitleaks · full history, icon: key, at: [0, 0], color: green}
+    - {id: b, label: SAST, sub: Semgrep → code scanning, icon: search, at: [0, 1], color: green}
+    - {id: c, label: SCA + IaC, sub: Trivy fs, icon: trivy, at: [0, 2], color: green}
+    - {id: d, label: Build, sub: image, icon: docker, at: [1, 1], color: purple}
+    - {id: e, label: SBOM, sub: SPDX, icon: sbom, at: [2, 1], color: purple}
+    - {id: f, label: Image CVE gate, sub: Trivy image, icon: shield, at: [3, 1], color: green, pulse: true}
+    - {id: g, label: Smoke test, sub: container runs, icon: terminal, at: [4, 1], color: purple}
+    - {id: h, label: Push · sign · attest, sub: main only, icon: [registry, signature], at: [5, 0.25], color: green}
+    - {id: i, label: Stop, sub: pull request · nothing published, icon: deny, at: [5, 1.75], color: red}
+  edges:
+    - {from: a, to: d, kind: data}
+    - {from: b, to: d, kind: data}
+    - {from: c, to: d, kind: data}
+    - {from: d, to: e, kind: data, packet: box}
+    - {from: e, to: f, kind: data, packet: box}
+    - {from: f, to: g, kind: data, packet: box}
+    - {from: g, to: h, label: main, kind: secure}
+    - {from: g, to: i, label: PR, kind: deny}
