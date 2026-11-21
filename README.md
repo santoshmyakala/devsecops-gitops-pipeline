@@ -23,8 +23,6 @@ The first consumer is [wine-quality-mlops](https://github.com/santoshmyakala/win
   <img alt="Signed supply chain: a developer push runs app CI, which calls the reusable secure-container workflow (code scans, build, SBOM, Trivy image gate, smoke test, push, keyless sign and attest via Sigstore Fulcio and Rekor). A release manager runs promote.yml, which verifies the signature and commits the digest to gitops environments; Argo CD syncs and Kyverno admits only pods whose images are signed by the pipeline identity." src="docs/diagrams/supply-chain-light.svg" width="100%">
 </picture>
 
-<sub>Animated diagram generated from <a href="docs/diagrams">docs/diagrams/*.yaml</a> with <a href="https://github.com/santoshmyakala/santoshmyakala/tree/main/tools/archdiagram">archdiagram</a>.</sub>
-
 ### Pipeline stages and gates
 
 <picture>
